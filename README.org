@@ -833,6 +833,7 @@ always go to Evil modes if you need to with ~C-z~).
 | agent-shell-busy-indicator-frames             | Frames for the busy indicator animation.                                        |
 | agent-shell-clipboard-image-handlers          | Handlers for saving clipboard images to a file.                                 |
 | agent-shell-completion-mode-hook              | Hook run after entering or leaving ‘agent-shell-completion-mode’.               |
+| agent-shell-completion-retrigger-commands     | Editing commands after which @ and / completion is re-evaluated.                |
 | agent-shell-command-prefix                    | Command prefix for executing commands in a container.                           |
 | agent-shell-context-sources                   | Sources to consider when determining M-x agent-shell automatic context.         |
 | agent-shell-cursor-acp-command                | Command and parameters for the Cursor agent client.                             |

@@ -27,5 +27,28 @@
       (should (equal (map-elt bounds :start) 3))
       (should (equal (map-elt bounds :end) 7)))))
 
+(ert-deftest agent-shell--completion-retrigger-p-in-file-context-test ()
+  "Point inside an active @ context re-triggers (returns ?@)."
+  (with-temp-buffer
+    (insert " @rea")
+    (goto-char (point-max))
+    (should (equal (agent-shell--completion-retrigger-p) ?@))))
+
+(ert-deftest agent-shell--completion-retrigger-p-plain-word-test ()
+  "Ordinary words (no @ or / trigger) never re-trigger completion.
+This guards against surfacing comint's filesystem completion for words
+like `agent-shell'."
+  (with-temp-buffer
+    (insert "agent-shell")
+    (goto-char (point-max))
+    (should-not (agent-shell--completion-retrigger-p))))
+
+(ert-deftest agent-shell--completion-retrigger-p-after-trigger-deleted-test ()
+  "Once the @ trigger is gone, re-triggering stops."
+  (with-temp-buffer
+    (insert " rea")
+    (goto-char (point-max))
+    (should-not (agent-shell--completion-retrigger-p))))
+
 (provide 'agent-shell-completion-tests)
 ;;; agent-shell-completion-tests.el ends here

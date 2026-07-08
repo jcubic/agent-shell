@@ -39,6 +39,25 @@
   :type 'boolean
   :group 'agent-shell)
 
+(defcustom agent-shell-completion-retrigger-commands
+  '(delete-backward-char
+    backward-delete-char
+    backward-delete-char-untabify
+    delete-char
+    delete-forward-char)
+  "Editing commands after which @ and / completion is re-evaluated.
+
+When one of these commands runs and point sits inside an active @ or /
+trigger context, completion is reopened.  This lets you recover a popup
+that was dismissed after typing a non-matching character (for example by
+deleting the offending character), the way `company-mode' does.
+
+This is deliberately scoped to trigger contexts rather than relying on
+`corfu-auto', which would also surface `comint's filesystem completion
+for ordinary words typed at the prompt."
+  :type '(repeat function)
+  :group 'agent-shell)
+
 (defun agent-shell--completion-bounds (char-class trigger-char)
   "Find completion bounds for CHAR-CLASS, if TRIGGER-CHAR precedes them.
 Returns alist with :start and :end if TRIGGER-CHAR is found before
@@ -133,6 +152,35 @@ preventing spurious completions mid-word or in paths."
            (agent-shell--command-completion-at-point))
       (completion-at-point)))))
 
+(defun agent-shell--completion-retrigger-p ()
+  "Return the trigger char (?@ or ?/) if point is in an active context.
+
+Returns ?@ when point is inside an @ file-completion context, ?/ when it
+is inside a / command-completion context that has commands to offer, and
+nil otherwise.  Ordinary words at the prompt return nil, so editing them
+never spawns completion.
+
+For example, with point after the X in \"@readmeX\" this returns ?@,
+while with point after \"agent-shell\" it returns nil."
+  (cond
+   ((agent-shell--completion-bounds "[:alnum:]/_.-" ?@) ?@)
+   ((and (agent-shell--completion-bounds "[:alnum:]_-" ?/)
+         (agent-shell--command-completion-at-point))
+    ?/)))
+
+(defun agent-shell--retrigger-completion ()
+  "Reopen @ or / completion after a deletion edits into an active context.
+
+Hooked onto `post-command-hook'.  No-ops unless `this-command' is listed
+in `agent-shell-completion-retrigger-commands', completion is not already
+in progress, and point sits inside an active trigger context.  This makes
+deleting a non-matching character bring the popup back, without enabling
+`corfu-auto'."
+  (when (and (not completion-in-region-mode)
+             (memq this-command agent-shell-completion-retrigger-commands)
+             (agent-shell--completion-retrigger-p))
+    (completion-at-point)))
+
 (defun agent-shell-completion--setup-minibuffer (shell-buffer)
   "Enable @ and / completion in the current minibuffer for SHELL-BUFFER.
 
@@ -150,6 +198,8 @@ enabled, so user preference set in the shell carries over."
               #'agent-shell--command-completion-at-point nil t)
     (add-hook 'post-self-insert-hook
               #'agent-shell--trigger-completion-at-point nil t)
+    (add-hook 'post-command-hook
+              #'agent-shell--retrigger-completion nil t)
     (add-hook 'minibuffer-exit-hook
               #'agent-shell-completion--cleanup-minibuffer nil t)))
 
@@ -162,6 +212,8 @@ enabled, so user preference set in the shell carries over."
                #'agent-shell--command-completion-at-point t)
   (remove-hook 'post-self-insert-hook
                #'agent-shell--trigger-completion-at-point t)
+  (remove-hook 'post-command-hook
+               #'agent-shell--retrigger-completion t)
   (remove-hook 'minibuffer-exit-hook
                #'agent-shell-completion--cleanup-minibuffer t))
 
@@ -172,10 +224,12 @@ enabled, so user preference set in the shell carries over."
       (progn
         (add-hook 'completion-at-point-functions #'agent-shell--file-completion-at-point nil t)
         (add-hook 'completion-at-point-functions #'agent-shell--command-completion-at-point nil t)
-        (add-hook 'post-self-insert-hook #'agent-shell--trigger-completion-at-point nil t))
+        (add-hook 'post-self-insert-hook #'agent-shell--trigger-completion-at-point nil t)
+        (add-hook 'post-command-hook #'agent-shell--retrigger-completion nil t))
     (remove-hook 'completion-at-point-functions #'agent-shell--file-completion-at-point t)
     (remove-hook 'completion-at-point-functions #'agent-shell--command-completion-at-point t)
-    (remove-hook 'post-self-insert-hook #'agent-shell--trigger-completion-at-point t)))
+    (remove-hook 'post-self-insert-hook #'agent-shell--trigger-completion-at-point t)
+    (remove-hook 'post-command-hook #'agent-shell--retrigger-completion t)))
 
 (provide 'agent-shell-completion)
 
